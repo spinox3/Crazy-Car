@@ -1,6 +1,6 @@
 // Servo Motor controller without Servo.h library
 //@author Marino
-//@version 23.02.2025
+//@version 26.02.2025
 
 void setup() {
   pinMode(9, OUTPUT); // Pin 9 als Ausgang (OC1A)
@@ -16,10 +16,12 @@ void setup() {
 
 
 void loop() {
-  OCR1A = 1000; // 1000 * 0.5us = 0.5ms whole Period = 1ms = 0°
-  delay(1000);
-  OCR1A = 1500;
-  delay(1000);
-  OCR1A = 2000;
+  control(1000); 
+  control(2500);
+  control(5000); 
+}
+
+void control(int grad) {
+  OCR1A = grad;
   delay(1000);
 }
