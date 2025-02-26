@@ -16,12 +16,12 @@ void setup() {
 
 
 void loop() {
-  control(1000); 
-  control(2500);
-  control(5000); 
+  control(0); 
+  control(90);
+  control(180); 
 }
 
 void control(int grad) {
-  OCR1A = grad;
+  OCR1A = map(grad, 0, 180, 1000, 4950); // map correctly to be able to enter degrees
   delay(1000);
 }
