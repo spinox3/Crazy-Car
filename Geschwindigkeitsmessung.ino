@@ -6,7 +6,9 @@ const unsigned long distance_per_impulse = 5;
 unsigned long lastMillis = 0;
 unsigned long lastMovementMillis = 0;
 //zählt die Impulse des Encoders
-volatile unsigned long ImpulseCounter = 0;
+volatile bool debounceISR = false;
+volatile long ImpulseReset = 0;
+volatile long ImpulseCounter = 0;
 unsigned long LastImpulseCounted = 0;
 //Zeit die vergeht wo das Fahrzeug als "stillstehend" gesehen wird
 const unsigned long NoMovementTime = 2000;
@@ -16,13 +18,15 @@ void setup() {
   Serial.begin(9600);
   pinMode(CLK, INPUT);
   //Interrupt für den Encoder setzen
-  attachInterrupt(digitalPinToInterrupt(CLK), impulse_get, RISING);
+  attachInterrupt(digitalPinToInterrupt(CLK), impulseA_get, FALLING);
+  attachInterrupt(digitalPinToInterrupt(DT), impulseB_get, FALLING);
 }
 
 void loop() {
   unsigned long currentMillis = millis();
     //Geschwindigkeits und Distanzberechnung alle 1000ms
     //Der Timer ist 1Hz
+    debounceISR = true;
     if (currentMillis - lastMillis >= 1000){
       lastMillis = currentMillis;
     //Neuen Impulse zählen
@@ -46,10 +50,27 @@ void loop() {
     //Erkennen ob das Auto steht
     if (currentMillis - lastMovementMillis > NoMovementTime) {
     Serial.println("Das Fahrzeug steht still");
+    debounceISR = false;
     }
   }
 }  
-//Interrupt Service Routine für den Encoder     
-void impulse_get() {
-  ImpulseCounter++;
+   
+void impulseA_get() {
+  if (debounceISR == false) { 
+    ImpulseReset++; 
+    if (ImpulseReset == 2) {
+      ImpulseCounter--; 
+      ImpulseReset = 0;
+    }
+  } 
+}
+
+void impulseB_get() {
+  if (debounceISR == false) {
+    ImpulseReset++;
+    if (ImpulseReset == 2) {
+      ImpulseCounter++; 
+      ImpulseReset = 0;
+    }
+  }     
 }
