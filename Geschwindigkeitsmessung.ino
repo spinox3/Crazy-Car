@@ -1,76 +1,66 @@
 #define CLK 2
 #define DT 3
-//Distanz pro Impuls in Millimetern
-const unsigned long distance_per_impulse = 5;
-//Variablen zur Messung der Zeitinervallen
-unsigned long lastMillis = 0;
-unsigned long lastMovementMillis = 0;
-//zählt die Impulse des Encoders
-volatile bool debounceISR = false;
-volatile long ImpulseReset = 0;
+// Distance per impulse in mm
+const float distance_per_impulse = 5;
+//counting impulses of encoder
 volatile long ImpulseCounter = 0;
 unsigned long LastImpulseCounted = 0;
-//Zeit die vergeht wo das Fahrzeug als "stillstehend" gesehen wird
-const unsigned long NoMovementTime = 2000;
-
+//counting the time when the programm started
+unsigned long lastMillis = 0;
+unsigned long lastMovementMillis = 0;
+//time it takes to detect if the vehicle is standing
+const unsigned long NoMovementTime = 2000; 
 
 void setup() {
   Serial.begin(9600);
-  pinMode(CLK, INPUT);
-  //Interrupt für den Encoder setzen
-  attachInterrupt(digitalPinToInterrupt(CLK), impulseA_get, FALLING);
-  attachInterrupt(digitalPinToInterrupt(DT), impulseB_get, FALLING);
+  pinMode(CLK, INPUT_PULLUP);
+  pinMode(DT, INPUT_PULLUP);
+  
+  // setting interrupt for
+  attachInterrupt(digitalPinToInterrupt(CLK), impulse_get, FALLING);
 }
 
 void loop() {
   unsigned long currentMillis = millis();
-    //Geschwindigkeits und Distanzberechnung alle 1000ms
-    //Der Timer ist 1Hz
-    debounceISR = true;
-    if (currentMillis - lastMillis >= 1000){
-      lastMillis = currentMillis;
-    //Neuen Impulse zählen
-    unsigned long Impulses = ImpulseCounter - LastImpulseCounted;
+
+  // calculating distance and speed every 1000ms
+  if (currentMillis - lastMillis >= 1000) {
+    lastMillis = currentMillis;
+
+    // counting new impulses
+    long Impulses = ImpulseCounter - LastImpulseCounted;
     LastImpulseCounted = ImpulseCounter;
-    //Berechnung der Geschwindigkeit
-    float speed = Impulses * distance_per_impulse;
-    float distance = ImpulseCounter * distance_per_impulse;
-    //Die letzte Bewegung aktualisieren wenn Impulse erkannt werden
-    if (Impulses > 0) {
+
+    // calculating speed
+    float speed = (Impulses * distance_per_impulse); // Meter pro Sekunde
+    float distance = ImpulseCounter * distance_per_impulse; // Gesamtstrecke in Meter
+
+    // if movement is detected counts impulse
+    if (Impulses != 0) {
       lastMovementMillis = currentMillis;
     }
-    //Asugabe in Text
+
+    // writing the values in serial monitor
     Serial.print("Geschwindigkeit: ");
-    Serial.print(speed);
-    Serial.println("m/s");
+    Serial.print(speed, 3);
+    Serial.println(" m/s");
 
     Serial.print("Strecke: ");
-    Serial.print(distance);
-    Serial.println("m");
-    //Erkennen ob das Auto steht
+    Serial.print(distance, 3);
+    Serial.println(" m");
+
+    // detecting if vehicle stands still
     if (currentMillis - lastMovementMillis > NoMovementTime) {
-    Serial.println("Das Fahrzeug steht still");
-    debounceISR = false;
+      Serial.println("Das Fahrzeug steht still");
     }
   }
-}  
-   
-void impulseA_get() {
-  if (debounceISR == false) { 
-    ImpulseReset++; 
-    if (ImpulseReset == 2) {
-      ImpulseCounter--; 
-      ImpulseReset = 0;
-    }
-  } 
 }
 
-void impulseB_get() {
-  if (debounceISR == false) {
-    ImpulseReset++;
-    if (ImpulseReset == 2) {
-      ImpulseCounter++; 
-      ImpulseReset = 0;
-    }
-  }     
+// Interrupt Service Routing for encoder
+void impulse_get() {
+  if (digitalRead(DT) == LOW) {
+    ImpulseCounter--; // backwards
+  } else {
+      ImpulseCounter++;
+  }
 }
