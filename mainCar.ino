@@ -109,5 +109,5 @@ ISR(TIMER1_COMPA_vect) {
 // ADC ISR -> Stores ADC value and selects next channel
 ISR(ADC_vect) {
     adcValues[currentChannel] = ADC;
-    currentChannel = (currentChannel + 1) % ADC_CHANNELS;
+    currentChannel = (currentChannel + 1) % ADC_CHANNELS; // Switches channels at the end of the code
 }
