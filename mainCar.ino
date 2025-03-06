@@ -6,7 +6,7 @@
 #define DT 3  // Encoder pin for speed measurement
 
 // Distance per encoder pulse in millimeters
-const unsigned long distance_per_impulse = 5;
+const float distance_per_impulse = 5;
 
 int grad = 0;
 
@@ -15,7 +15,7 @@ unsigned long lastMillis = 0;
 unsigned long lastMovementMillis = 0;
 
 // Counter for encoder pulses
-volatile unsigned long ImpulseCounter = 0;
+volatile long ImpulseCounter = 0;
 unsigned long LastImpulseCounted = 0;
 
 // Time after which the vehicle is considered stationary (in ms)
@@ -39,8 +39,9 @@ void setup() {
 
     // Speed sensor (Mario Bosnjak)
     Serial.begin(9600);
-    pinMode(CLK, INPUT);
-    attachInterrupt(digitalPinToInterrupt(CLK), impulse_get, RISING);
+    pinMode(CLK, INPUT_PULLUP);
+    pinMode(DT, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(CLK), impulse_get, FALLING);
 
     // ADC initialization (Nevio Mautner)
     cli();  // Disable interrupts
@@ -66,33 +67,37 @@ void loop() {
         grad += 10;
         lastMillis = currentMillis;
         
-        unsigned long Impulses = ImpulseCounter - LastImpulseCounted;
+        long Impulses = ImpulseCounter - LastImpulseCounted;
         LastImpulseCounted = ImpulseCounter;
 
         float speed = Impulses * distance_per_impulse;
         float distance = ImpulseCounter * distance_per_impulse;
 
-        if (Impulses > 0) {
+        if (Impulses != 0) {
             lastMovementMillis = currentMillis;
         }
 
-        Serial.print("Speed: ");
-        Serial.print(speed);
-        Serial.println(" mm/s");
+        Serial.print("Geschwindigkeit: ");
+        Serial.print(speed, 3);
+        Serial.println(" m/s");
 
-        Serial.print("Distance: ");
-        Serial.print(distance);
-        Serial.println(" mm");
+        Serial.print("Strecke: ");
+        Serial.print(distance, 3);
+        Serial.println(" m");
 
         if (currentMillis - lastMovementMillis > NoMovementTime) {
-            Serial.println("The vehicle is stationary");
+            Serial.println("Das Fahrzeug steht still");
         }
     }
 }
 
 // ISR for encoder pulse counting
 void impulse_get() {
-    ImpulseCounter++;
+    if (digitalRead(DT) == LOW) {
+        ImpulseCounter--; // backwards
+    } else {
+        ImpulseCounter++;
+    }
 }
 
 // Servo control function (Marino Batarilo)
