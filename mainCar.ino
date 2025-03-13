@@ -65,7 +65,9 @@ void loop() {
     if (currentMillis - lastMillis >= 1000) {
         control(grad);
         grad += 10;
-        if (grad > 180) grad = 0; // Reset servo position
+        if (grad > 180){
+          grad = 0; // Reset servo position
+        } 
         lastMillis = currentMillis;
         
         long Impulses = ImpulseCounter - LastImpulseCounted;
