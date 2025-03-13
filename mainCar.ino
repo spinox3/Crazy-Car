@@ -65,6 +65,7 @@ void loop() {
     if (currentMillis - lastMillis >= 1000) {
         control(grad);
         grad += 10;
+        if (grad > 180) grad = 0; // Reset servo position
         lastMillis = currentMillis;
         
         long Impulses = ImpulseCounter - LastImpulseCounted;
@@ -87,6 +88,14 @@ void loop() {
 
         if (currentMillis - lastMovementMillis > NoMovementTime) {
             Serial.println("Das Fahrzeug steht still");
+        }
+
+        // Print ADC values for channels 0-3
+        for (uint8_t i = 0; i < ADC_CHANNELS; i++) {
+            Serial.print("ADC ");
+            Serial.print(i);
+            Serial.print(": ");
+            Serial.println(adcValues[i]);
         }
     }
 }
