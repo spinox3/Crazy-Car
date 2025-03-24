@@ -24,22 +24,23 @@ const unsigned long NoMovementTime = 2000;
 // ADC variables (Nevio Mautner)
 #define ADC_CHANNELS 4
 volatile uint16_t adcValues[ADC_CHANNELS]; // Stores ADC values per channel
-volatile uint8_t currentChannel = 0; // Starts at channel 0
+volatile uint8_t currentChannel = 0; // Starts at channel 0 //ENK: statische Variable verwenden
 
 void setup() {
     // Servo initialization (Marino Batarilo) -> MOVED TO TIMER4!
     pinMode(6, OUTPUT); // Servo pin (OC4A)
+	//ENK: Disable interrupts an dieser Stelle !
 
-    // Timer4 for servo control
+    // Timer4 for servo control ENK: Lenksero ist am OC3A angeschlossen --> Timer 3
     TCCR4A = 0;
     TCCR4B = 0;
     TCCR4A = (1 << COM4A1) | (1 << WGM41);  
     TCCR4B = (1 << WGM43) | (1 << WGM42) | (1 << CS41); // Prescaler 8 -> 2MHz
-    ICR4 = 20000; // PWM period 20ms (50Hz servo frequency)
+    ICR4 = 20000; // PWM period 20ms (50Hz servo frequency) //ENK: Lenk Servo kann 400Hz
 
     // Speed sensor (Mario Bosnjak)
     Serial.begin(9600);
-    pinMode(CLK, INPUT_PULLUP);
+    pinMode(CLK, INPUT_PULLUP); //ENK: Pullup nicht notwendig
     pinMode(DT, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(CLK), impulse_get, FALLING);
 
@@ -69,7 +70,7 @@ void loop() {
           grad = 0; // Reset servo position
         } 
         lastMillis = currentMillis;
-        
+        //ENK: Geschwindigkeitsmessung funktioniert grund säzlich, eine Aktualisierung jede Sekunde ist jedoch viel zu lang.
         long Impulses = ImpulseCounter - LastImpulseCounted;
         LastImpulseCounted = ImpulseCounter;
 
@@ -113,10 +114,11 @@ void impulse_get() {
 
 // Servo control function (Marino Batarilo)
 void control(int grad) {
+	//ENK: Warum 1000, 4950 ... magic numbers
     OCR4A = map(grad, 0, 180, 1000, 4950); // Map degrees (0-180) to PWM values (1000-4950)
 }
 
-// Timer1 ISR -> Triggers ADC conversion
+// Timer1 ISR -> Triggers ADC conversion //ENK: ist nicht notwendig wenn Timer1 ADC direkt triggert
 ISR(TIMER1_COMPA_vect) {
     ADMUX = (ADMUX & 0xF0) | currentChannel;
     ADCSRA |= (1 << ADSC);
