@@ -1,0 +1,101 @@
+// Speed Control for Crazy Car
+// @Author Marino Batarilo, Ismar Ruznic
+
+#include <Arduino.h>
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <Servo.h>
+
+// === Servo Configuration ===
+#define PIN_SPEED_SERVO   2            // Servo control pin
+#define MIN_SERVO_MS      1300         // Minimum PWM (full reverse)
+#define MAX_SERVO_MS      1700         // Maximum PWM (full forward)
+#define STOP_SERVO_MS     1500         // Neutral PWM (stop)
+
+Servo speedServo;
+
+// === ADC Configuration ===
+volatile uint16_t adcResults[4] = {0}; // Stores the latest ADC values for channels 0–3
+volatile uint8_t currentChannel = 0;   // Current ADC channel being read
+
+// === Sensor Filtering ===
+int filteredVal = 0;                   // Filtered distance value (from middle sensor)
+const float alpha = 0.5;               // Smoothing factor for exponential filtering
+
+// === Servo Speed ===
+uint16_t servoSpeed_ms = STOP_SERVO_MS; // Current PWM value for the servo
+
+// === Timer for Serial Output ===
+unsigned long lastPrintTime = 0;      // Last time values were printed to Serial
+#define PRINT_INTERVAL 500            // Interval for serial output in milliseconds
+
+void setup() {
+  Serial.begin(115200);
+  Serial3.begin(115200);
+
+  speedServo.attach(PIN_SPEED_SERVO);
+  speedServo.writeMicroseconds(STOP_SERVO_MS); // Send stop signal at startup
+  delay(1000); // Wait 1 second to ensure 1500µs is interpreted as "stop"
+
+  cli(); // Disable global interrupts
+
+  // === ADC Setup ===
+  ADMUX = (1 << REFS1) | (1 << REFS0) | 0x03; // Use internal 2.56V ref, start with channel ADC3 (middle sensor)
+
+  ADCSRA = (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // Prescaler = 128 → 125kHz ADC clock @ 16MHz
+
+  ADCSRB = (1 << ADTS2) | (1 << ADTS0); // Auto Trigger Source: Timer1 Compare Match B
+
+  DIDR0 = (1 << ADC0D) | (1 << ADC1D) | (1 << ADC2D) | (1 << ADC3D); // Disable digital input buffers for ADC0–3
+
+  ADCSRA |= (1 << ADATE) | (1 << ADIE); // Enable Auto Trigger and ADC Interrupt
+  ADCSRA |= (1 << ADEN);                // Enable ADC
+
+  // === Timer1 Setup (Trigger for ADC) ===
+  TCCR1A = 0;                             // Normal mode
+  TCCR1B = (1 << WGM12) | (1 << CS11) | (1 << CS10); // CTC mode, Prescaler = 64
+  OCR1A = 3124;                           // Compare Match A: 12.5ms
+  OCR1B = 3124;                           // Compare Match B: used to trigger ADC
+
+  sei(); // Enable global interrupts
+}
+
+void loop() {
+  // === Apply Exponential Filter to ADC Value ===
+  float sensorValue = adcResults[3]; // Use channel 3 (middle sensor)
+  filteredVal = alpha * sensorValue + (1 - alpha) * filteredVal;
+
+  // === Map Distance to Speed ===
+  // If object is far (value ~50) → drive fast; if close (~200) → stop
+  int mappedSpeed = map(filteredVal, 50, 200, MAX_SERVO_MS, STOP_SERVO_MS);
+  servoSpeed_ms = constrain(mappedSpeed, MIN_SERVO_MS, MAX_SERVO_MS); // Clamp to safe PWM range
+
+  speedServo.writeMicroseconds(servoSpeed_ms); // Set new speed
+
+  // === Periodic Serial Output ===
+  unsigned long currentTime = millis();
+  if (currentTime - lastPrintTime >= PRINT_INTERVAL) {
+    lastPrintTime = currentTime;
+
+    Serial.print("ADC3 Raw (distance to object): ");
+    Serial.print(sensorValue);
+    Serial.print(" | Filtered: ");
+    Serial.print(filteredVal, 2);
+    Serial.print(" | Speed: ");
+    Serial.println(servoSpeed_ms);
+
+    Serial3.print("Speed: ");
+    Serial3.println(servoSpeed_ms);
+  }
+
+  delay(10); // Slight CPU relief
+}
+
+// === ADC Interrupt Service Routine ===
+ISR(ADC_vect) {
+  adcResults[currentChannel] = ADC; // Save current ADC result
+
+  currentChannel = (currentChannel + 1) % 4;             // Rotate through ADC0–3
+  ADMUX = (ADMUX & 0xF0) | currentChannel;               // Set new channel (lower bits only)
+  TIFR1 = (1 << OCF1B);                                  // Clear Timer1 Compare Match B Flag
+}
